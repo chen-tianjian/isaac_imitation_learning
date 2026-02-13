@@ -1,135 +1,117 @@
-# Template for Isaac Lab Projects
+# Isaac Imitation Learning
 
-## Overview
+Imitation learning with Isaac Lab/Sim and Robomimic (ACT, Diffusion Policy, BC).
 
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
-
-**Key Features:**
-
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
-
-**Keywords:** extension, template, isaaclab
+This Isaac Lab extension trains and evaluates imitation learning policies in GPU-accelerated simulation. It augments Isaac Lab task environments with robomimic policy entry points and integrates ClearML for experiment tracking.
 
 ## Installation
 
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
+1. Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). Conda or uv installation recommended.
 
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
+2. Clone this repository (outside the IsaacLab directory):
 
     ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
+    git clone https://github.com/chen-tianjian/isaac_imitation_learning.git
+    cd isaac_imitation_learning
+    ```
+
+3. Install the package (using a Python interpreter with Isaac Lab installed):
+
+    ```bash
     python -m pip install -e source/isaac_imitation_learning
+    ```
 
-- Verify that the extension is correctly installed by:
+4. (Optional) Set up ClearML for experiment tracking:
 
-    - Listing the available tasks:
+    ```bash
+    clearml-init
+    ```
 
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
+    ClearML is installed automatically but only activates when configured. Without it, all training logs are saved locally.
 
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
+## Usage
 
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/isaac_imitation_learning/isaac_imitation_learning/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
+### Training
 
 ```bash
-pip install pre-commit
+python scripts/robomimic/train.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --algo=act --dataset=/path/to/data.hdf5
+python scripts/robomimic/train.py --task=Isaac-Stack-Cube-Franka-IK-Rel-Visuomotor-v0 --algo=diffusion_policy --dataset=/path/to/data.hdf5
 ```
 
-Then you can run pre-commit with:
+Datasets can also be pulled from ClearML by `clearml://` URIs:
 
 ```bash
-pre-commit run --all-files
+python scripts/robomimic/train.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --algo=act --dataset=clearml://<DATASET_ID>/data.hdf5
 ```
 
-## Troubleshooting
+Key flags:
+- `--dataset PATH` -- Local path or `clearml://<DATASET_ID>[/<filename>]`
+- `--epochs N` -- Override epoch count
+- `--normalize_training_actions` -- Normalize actions to [-1, 1]
+- `--clearml_project NAME` -- ClearML project name
+- `--remote` -- Execute on ClearML agent queue
+- `--no_clearml` -- Disable ClearML even if configured
 
-### Pylance Missing Indexing of Extensions
+### Evaluation
 
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
-
-```json
-{
-    "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/isaac_imitation_learning"
-    ]
-}
+```bash
+python scripts/robomimic/play.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --checkpoint=/path/to/model.pth
+python scripts/robomimic/robust_eval.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --input_dir=/path/to/checkpoints/
 ```
 
-### Pylance Crash
+Both scripts support `clearml://` URIs to resolve checkpoints from ClearML:
 
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
+```bash
+# Auto-select the latest checkpoint by epoch number
+python scripts/robomimic/play.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --checkpoint=clearml://<TASK_ID>
 
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
+# Or specify a specific checkpoint artifact
+python scripts/robomimic/play.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0 --checkpoint=clearml://<TASK_ID>/model_epoch_100.pth
 ```
+
+### Dummy Agents
+
+Useful for verifying environment configuration:
+
+```bash
+python scripts/zero_agent.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0
+python scripts/random_agent.py --task=Isaac-Stack-Cube-Franka-IK-Rel-v0
+```
+
+### List Environments
+
+```bash
+python scripts/list_envs.py
+python scripts/list_envs.py --keyword "Franka"
+```
+
+## Project Structure
+
+```
+scripts/
+    robomimic/train.py          # Training with ACT, Diffusion Policy, BC
+    robomimic/play.py           # Single-checkpoint evaluation
+    robomimic/robust_eval.py    # Batch evaluation across checkpoints
+    random_agent.py             # Random action agent
+    zero_agent.py               # Zero action agent
+    list_envs.py                # List registered environments
+source/isaac_imitation_learning/
+    isaac_imitation_learning/
+        tasks/                  # Environment registration and configs
+        utils/
+            clearml_utils.py    # ClearML integration (conditional activation)
+            policy_utils.py     # Action chunking helpers
+tests/                          # Unit tests (run without Isaac Sim)
+```
+
+## Testing
+
+```bash
+python -m pytest tests/ -v
+```
+
+Tests run without Isaac Sim or ClearML credentials.
+
+## License
+
+BSD-3-Clause

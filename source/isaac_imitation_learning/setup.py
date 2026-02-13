@@ -25,7 +25,7 @@ setup(
     description="Imitation learning with Isaac Lab/Sim and Robomimic (ACT, Diffusion Policy, BC)",
     keywords=["imitation-learning", "robomimic", "isaaclab", "act", "diffusion-policy"],
     install_requires=INSTALL_REQUIRES,
-    license="Apache-2.0",
+    license="BSD-3-Clause",
     include_package_data=True,
     package_data={
         "isaac_imitation_learning": ["tasks/**/agents/robomimic/*.json"],
