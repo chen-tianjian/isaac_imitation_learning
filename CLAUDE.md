@@ -10,8 +10,11 @@ Isaac Imitation Learning is an Isaac Lab extension for training and evaluating i
 
 ### Installation
 ```bash
-# Requires Isaac Lab pre-installed (conda or uv recommended)
-python -m pip install -e source/isaac_imitation_learning
+# With pip
+pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
+
+# With uv (index URLs are read from pyproject.toml)
+uv pip install -e .
 ```
 
 ### Training
@@ -111,7 +114,7 @@ Entry points follow the pattern: `robomimic_{algo}_cfg_entry_point` pointing to 
 ## Code Style
 
 - Line length: 120
-- Python: 3.10+
+- Python: 3.11
 - Docstrings: Google style
 - Import order: standard-library → third-party → omniverse → isaaclab modules → first-party
 - Linting: ruff with E, W, F, I, UP, C90, SIM, RET rules
@@ -119,7 +122,9 @@ Entry points follow the pattern: `robomimic_{algo}_cfg_entry_point` pointing to 
 
 ## Key Dependencies
 
-- Isaac Lab (external, must be pre-installed)
+- Isaac Sim (`isaacsim[all,extscache]==5.1.0`) — from NVIDIA PyPI
+- PyTorch (`torch==2.7.0`, `torchvision==0.22.0`) — from PyTorch cu128 index
+- Isaac Lab (`isaaclab==2.3.2`) — from NVIDIA PyPI
 - robomimic fork: `git+https://github.com/chen-tianjian/robomimic.git@act`
 - clearml (required, conditionally active)
 - psutil

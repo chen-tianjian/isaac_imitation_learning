@@ -3,6 +3,48 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+[build-system]
+requires = ["setuptools", "wheel", "toml"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isaac_imitation_learning"
+version = "0.1.0"
+description = "Imitation learning with Isaac Lab/Sim and Robomimic (ACT, Diffusion Policy, BC)"
+requires-python = "==3.11.*"
+license = "BSD-3-Clause"
+authors = [{name = "Tianjian Chen"}]
+keywords = ["imitation-learning", "robomimic", "isaaclab", "act", "diffusion-policy"]
+dependencies = [
+    "isaacsim[all,extscache]==5.1.0",
+    "torch==2.7.0",
+    "torchvision==0.22.0",
+    "isaaclab==2.3.2",
+    "psutil",
+    "clearml",
+    "robomimic @ git+https://github.com/chen-tianjian/robomimic.git@act",
+]
+
+[project.urls]
+Homepage = "https://github.com/chen-tianjian/isaac_imitation_learning"
+
+[tool.setuptools.packages.find]
+where = ["source/isaac_imitation_learning"]
+
+[tool.setuptools.package-data]
+isaac_imitation_learning = ["tasks/**/agents/robomimic/*.json"]
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+# isaacsim-core unconditionally depends on pywin32 (Windows-only); override with platform marker
+override-dependencies = ["pywin32==306; sys_platform == 'win32'"]
+
+[[tool.uv.index]]
+url = "https://pypi.nvidia.com/simple"
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu128"
+
 [tool.ruff]
 line-length = 120
 target-version = "py310"

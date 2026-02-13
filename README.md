@@ -6,22 +6,39 @@ This Isaac Lab extension trains and evaluates imitation learning policies in GPU
 
 ## Installation
 
-1. Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). Conda or uv installation recommended.
+**Prerequisites:** Ubuntu 24.04 or 22.04. Python 3.11 (required by isaaclab 2.3 and isaacsim 5.1). NVIDIA GPU with CUDA support.
 
-2. Clone this repository (outside the IsaacLab directory):
+1. Clone this repository:
 
     ```bash
     git clone https://github.com/chen-tianjian/isaac_imitation_learning.git
     cd isaac_imitation_learning
     ```
 
-3. Install the package (using a Python interpreter with Isaac Lab installed):
+2. Create a Python 3.11 virtual environment and install (select one way below):
 
+    **virtualenv / venv**
     ```bash
-    python -m pip install -e source/isaac_imitation_learning
+    python3.11 -m venv .venv
+    source .venv/bin/activate
+    pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
     ```
 
-4. (Optional) Set up ClearML for experiment tracking:
+    **uv**
+    ```bash
+    uv venv --python 3.11 --seed
+    source .venv/bin/activate
+    uv pip install -e .
+    ```
+
+    **conda**
+    ```bash
+    conda create -n isaac python=3.11 -y
+    conda activate isaac
+    pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
+    ```
+
+3. (Optional) Set up ClearML for experiment tracking:
 
     ```bash
     clearml-init
