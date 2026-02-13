@@ -5,41 +5,26 @@
 
 """Installation script for the 'isaac_imitation_learning' python package."""
 
-import os
-
-import toml
 from setuptools import find_packages, setup
-
-# Obtain the extension data from the extension.toml file
-EXTENSION_PATH = os.path.dirname(os.path.realpath(__file__))
-# Read the extension.toml file
-EXTENSION_TOML_DATA = toml.load(os.path.join(EXTENSION_PATH, "config", "extension.toml"))
 
 # Minimum dependencies required prior to installation
 INSTALL_REQUIRES = [
     "psutil",
+    "clearml",
     "robomimic @ git+https://github.com/chen-tianjian/robomimic.git@act",
 ]
-
-# Optional dependencies
-EXTRAS_REQUIRE = {
-    "clearml": [
-        "clearml",
-    ],
-}
 
 # Installation operation
 setup(
     name="isaac_imitation_learning",
     packages=find_packages(),
-    author=EXTENSION_TOML_DATA["package"]["author"],
-    maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
-    url=EXTENSION_TOML_DATA["package"]["repository"],
-    version=EXTENSION_TOML_DATA["package"]["version"],
-    description=EXTENSION_TOML_DATA["package"]["description"],
-    keywords=EXTENSION_TOML_DATA["package"]["keywords"],
+    author="Tianjian Chen",
+    maintainer="Tianjian Chen",
+    url="https://github.com/chen-tianjian/isaac_imitation_learning",
+    version="0.1.0",
+    description="Imitation learning with Isaac Lab/Sim and Robomimic (ACT, Diffusion Policy, BC)",
+    keywords=["imitation-learning", "robomimic", "isaaclab", "act", "diffusion-policy"],
     install_requires=INSTALL_REQUIRES,
-    extras_require=EXTRAS_REQUIRE,
     license="Apache-2.0",
     include_package_data=True,
     package_data={

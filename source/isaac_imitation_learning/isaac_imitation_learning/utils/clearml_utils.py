@@ -5,12 +5,12 @@
 
 """Shared ClearML utility module for robomimic imitation learning scripts.
 
-Provides ClearML integration with graceful degradation when ClearML is not installed.
+Provides ClearML integration that activates when ClearML is configured (via ``clearml-init``).
 All public functions accept task=None and gracefully no-op.
 
 Key features:
     - Unified ``clearml://`` URI scheme for datasets, checkpoints, and input directories
-    - Auto-detect ClearML availability; ``--no_clearml`` to disable
+    - Auto-detect ClearML configuration; ``--no_clearml`` to disable
     - ``connect_configuration`` for config files (editable in ClearML UI)
     - ``report_media`` for inline video playback in ClearML "Debug Samples" tab
     - Continuous checkpoint upload as artifacts (crash resilient)
@@ -27,25 +27,38 @@ import tempfile
 Task = None
 Dataset = None
 
-# Cached result of ClearML availability check
-_clearml_available: bool | None = None
+# Cached result of ClearML configuration check
+_clearml_configured: bool | None = None
+_clearml_info_shown = False
 
 
-def is_clearml_available() -> bool:
-    """Check if the clearml package is importable. Caches the result.
+def is_clearml_configured() -> bool:
+    """Check if ClearML has been initialized (credentials configured). Caches the result.
+
+    Checks in order:
+        1. ``CLEARML_CONFIG_FILE`` env var — if set, checks that file exists.
+        2. ``~/clearml.conf`` — checks if file exists.
+        3. ``CLEARML_API_HOST`` env var — if set, treats ClearML as configured.
 
     Returns:
-        True if clearml is installed and importable, False otherwise.
+        True if ClearML credentials are configured, False otherwise.
     """
-    global _clearml_available
-    if _clearml_available is None:
-        try:
-            import clearml  # noqa: F401
+    global _clearml_configured, _clearml_info_shown
+    if _clearml_configured is None:
+        custom_config = os.environ.get("CLEARML_CONFIG_FILE")
+        if custom_config:
+            _clearml_configured = os.path.isfile(custom_config)
+        elif os.path.isfile(os.path.expanduser("~/clearml.conf")):
+            _clearml_configured = True
+        elif os.environ.get("CLEARML_API_HOST"):
+            _clearml_configured = True
+        else:
+            _clearml_configured = False
 
-            _clearml_available = True
-        except ImportError:
-            _clearml_available = False
-    return _clearml_available
+        if not _clearml_configured and not _clearml_info_shown:
+            print("[ClearML] Not configured (Run 'clearml-init' to enable experiment tracking). Only saving logs locally.")
+            _clearml_info_shown = True
+    return _clearml_configured
 
 
 def _ensure_clearml_imports():
@@ -124,7 +137,7 @@ def init_clearml_task(args, task_type: str, default_task_name: str):
     Returns:
         A ClearML Task instance, or None if ClearML is unavailable or disabled.
     """
-    if getattr(args, "no_clearml", False) or not is_clearml_available():
+    if getattr(args, "no_clearml", False) or not is_clearml_configured():
         return None
 
     try:

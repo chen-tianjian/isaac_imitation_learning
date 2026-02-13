@@ -74,11 +74,11 @@ class TestClearMLURIParsing(unittest.TestCase):
 class TestGracefulDegradation(unittest.TestCase):
     """Test that all functions gracefully no-op when task is None or ClearML unavailable."""
 
-    def test_is_clearml_available_when_not_installed(self):
-        from isaac_imitation_learning.utils.clearml_utils import is_clearml_available
+    def test_is_clearml_configured_returns_bool(self):
+        from isaac_imitation_learning.utils.clearml_utils import is_clearml_configured
 
         # The function should return a boolean without raising
-        result = is_clearml_available()
+        result = is_clearml_configured()
         self.assertIsInstance(result, bool)
 
     def test_init_clearml_task_returns_none_when_unavailable(self):
