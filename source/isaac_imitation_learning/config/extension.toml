@@ -7,29 +7,16 @@ version = "0.1.0"
 category = "isaaclab"
 readme  = "README.md"
 
-title = "Extension Template"
+title = "Isaac Imitation Learning"
 author = "Isaac Lab Project Developers"
 maintainer = "Isaac Lab Project Developers"
-description="Extension Template for Isaac Lab"
+description="Imitation learning extension for Isaac Lab (ACT, Diffusion Policy, BC-RNN)"
 repository = "https://github.com/isaac-sim/IsaacLab.git"
-keywords = ["extension", "template", "isaaclab"]
+keywords = ["imitation-learning", "robomimic", "isaaclab", "act", "diffusion-policy"]
 
 [dependencies]
 "isaaclab" = {}
-"isaaclab_assets" = {}
-"isaaclab_mimic" = {}
-"isaaclab_rl" = {}
 "isaaclab_tasks" = {}
-# NOTE: Add additional dependencies here
 
 [[python.module]]
 name = "isaac_imitation_learning"
-
-[isaac_lab_settings]
-# TODO: Uncomment and list any apt dependencies here.
-#       If none, leave it commented out.
-# apt_deps = ["example_package"]
-# TODO: Uncomment and provide path to a ros_ws
-#       with rosdeps to be installed. If none,
-#       leave it commented out.
-# ros_ws = "path/from/extension_root/to/ros_ws"

@@ -8,7 +8,7 @@
 import os
 
 import toml
-from setuptools import setup
+from setuptools import find_packages, setup
 
 # Obtain the extension data from the extension.toml file
 EXTENSION_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -17,14 +17,21 @@ EXTENSION_TOML_DATA = toml.load(os.path.join(EXTENSION_PATH, "config", "extensio
 
 # Minimum dependencies required prior to installation
 INSTALL_REQUIRES = [
-    # NOTE: Add dependencies
     "psutil",
+    "robomimic @ git+https://github.com/chen-tianjian/robomimic.git@act",
 ]
+
+# Optional dependencies
+EXTRAS_REQUIRE = {
+    "clearml": [
+        "clearml",
+    ],
+}
 
 # Installation operation
 setup(
     name="isaac_imitation_learning",
-    packages=["isaac_imitation_learning"],
+    packages=find_packages(),
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
     url=EXTENSION_TOML_DATA["package"]["repository"],
@@ -32,8 +39,12 @@ setup(
     description=EXTENSION_TOML_DATA["package"]["description"],
     keywords=EXTENSION_TOML_DATA["package"]["keywords"],
     install_requires=INSTALL_REQUIRES,
+    extras_require=EXTRAS_REQUIRE,
     license="Apache-2.0",
     include_package_data=True,
+    package_data={
+        "isaac_imitation_learning": ["tasks/**/agents/robomimic/*.json"],
+    },
     python_requires=">=3.10",
     classifiers=[
         "Natural Language :: English",
