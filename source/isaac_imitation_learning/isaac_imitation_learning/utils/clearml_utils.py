@@ -56,17 +56,13 @@ def is_clearml_configured() -> bool:
         custom_config = os.environ.get("CLEARML_CONFIG_FILE")
         if custom_config:
             _clearml_configured = os.path.isfile(custom_config)
-        elif os.path.isfile(os.path.expanduser("~/clearml.conf")) or os.environ.get(
-            "CLEARML_API_HOST"
-        ):
+        elif os.path.isfile(os.path.expanduser("~/clearml.conf")) or os.environ.get("CLEARML_API_HOST"):
             _clearml_configured = True
         else:
             _clearml_configured = False
 
         if not _clearml_configured and not _clearml_info_shown:
-            logger.info(
-                "Not configured (Run 'clearml-init' to enable experiment tracking). Only saving logs locally."
-            )
+            logger.info("Not configured (Run 'clearml-init' to enable experiment tracking). Only saving logs locally.")
             _clearml_info_shown = True
     return _clearml_configured
 
@@ -97,13 +93,11 @@ def add_clearml_args(parser):
     Args:
         parser: An argparse.ArgumentParser instance.
     """
-    group = parser.add_argument_group(
-        "ClearML", "ClearML experiment tracking arguments"
-    )
+    group = parser.add_argument_group("ClearML", "ClearML experiment tracking arguments")
     group.add_argument(
         "--clearml_project",
         type=str,
-        default="IsaacLab/Robomimic",
+        default="Isaac Imitation Learning",
         help="ClearML project name.",
     )
     group.add_argument(
@@ -155,8 +149,8 @@ def init_clearml_task(args, task_type: str, default_task_name: str):
     try:
         _ensure_clearml_imports()
         task_name = getattr(args, "clearml_task_name", None) or default_task_name
-        task = Task.init(
-            project_name=getattr(args, "clearml_project", "IsaacLab/Robomimic"),
+        task = Task.init(  # type: ignore
+            project_name=getattr(args, "clearml_project", "Isaac Imitation Learning"),
             task_name=task_name,
             task_type=task_type,
             auto_connect_arg_parser=False,
@@ -233,9 +227,7 @@ def parse_clearml_uri(uri: str) -> tuple[str, str | None]:
         ValueError: If the URI is malformed or empty.
     """
     if not uri or not uri.startswith("clearml://"):
-        raise ValueError(
-            f"Malformed ClearML URI: '{uri}'. Expected format: clearml://<id>[/<filename>]"
-        )
+        raise ValueError(f"Malformed ClearML URI: '{uri}'. Expected format: clearml://<id>[/<filename>]")
 
     remainder = uri[len("clearml://") :]
     if not remainder:
@@ -277,7 +269,7 @@ def resolve_dataset(dataset_arg: str) -> str:
     dataset_id, filename = parse_clearml_uri(dataset_arg)
 
     # Download dataset to local cache
-    dataset = Dataset.get(dataset_id=dataset_id)
+    dataset = Dataset.get(dataset_id=dataset_id)  # type: ignore
     local_dir = dataset.get_local_copy()
 
     if filename is not None:
@@ -300,9 +292,7 @@ def resolve_dataset(dataset_arg: str) -> str:
     if len(hdf5_files) == 1:
         return hdf5_files[0]
     elif len(hdf5_files) == 0:
-        raise FileNotFoundError(
-            f"No .hdf5 files found in ClearML dataset '{dataset_id}'."
-        )
+        raise FileNotFoundError(f"No .hdf5 files found in ClearML dataset '{dataset_id}'.")
     else:
         filenames = [os.path.relpath(f, local_dir) for f in hdf5_files]
         raise ValueError(
@@ -329,7 +319,7 @@ def resolve_checkpoint(checkpoint_arg: str) -> str:
     _ensure_clearml_imports()
     task_id, artifact_name = parse_clearml_uri(checkpoint_arg)
 
-    task = Task.get_task(task_id=task_id)
+    task = Task.get_task(task_id=task_id)  # type: ignore
 
     if artifact_name is not None:
         # Download specific artifact
@@ -374,7 +364,7 @@ def resolve_input_dir(input_dir_arg: str) -> str:
     _ensure_clearml_imports()
     task_id, _ = parse_clearml_uri(input_dir_arg)
 
-    task = Task.get_task(task_id=task_id)
+    task = Task.get_task(task_id=task_id)  # type: ignore
     pth_artifacts = {k: v for k, v in task.artifacts.items() if k.endswith(".pth")}
 
     if not pth_artifacts:
@@ -469,9 +459,7 @@ def report_scalar(task, title: str, series: str, value: float, iteration: int):
     """
     if task is None:
         return
-    task.get_logger().report_scalar(
-        title=title, series=series, value=value, iteration=iteration
-    )
+    task.get_logger().report_scalar(title=title, series=series, value=value, iteration=iteration)
 
 
 def report_evaluation_results(task, results_summary: dict, seed: int):
@@ -493,14 +481,10 @@ def report_evaluation_results(task, results_summary: dict, seed: int):
             continue
         best_model = max(model_results, key=model_results.get)
         best_rate = model_results[best_model]
-        task.get_logger().report_scalar(
-            title=f"eval_seed_{seed}", series=setting, value=best_rate, iteration=0
-        )
+        task.get_logger().report_scalar(title=f"eval_seed_{seed}", series=setting, value=best_rate, iteration=0)
 
     # Upload full results as artifact
-    task.upload_artifact(
-        name=f"eval_results_seed_{seed}", artifact_object=results_summary
-    )
+    task.upload_artifact(name=f"eval_results_seed_{seed}", artifact_object=results_summary)
 
 
 def report_video(task, video_path: str, title: str, series: str, iteration: int):
@@ -515,9 +499,7 @@ def report_video(task, video_path: str, title: str, series: str, iteration: int)
     """
     if task is None:
         return
-    task.get_logger().report_media(
-        title=title, series=series, local_path=video_path, iteration=iteration
-    )
+    task.get_logger().report_media(title=title, series=series, local_path=video_path, iteration=iteration)
 
 
 def upload_videos_from_dir(task, video_dir: str, title: str):
@@ -536,6 +518,4 @@ def upload_videos_from_dir(task, video_dir: str, title: str):
     mp4_files = sorted(f for f in os.listdir(video_dir) if f.endswith(".mp4"))
     for i, filename in enumerate(mp4_files):
         video_path = os.path.join(video_dir, filename)
-        task.get_logger().report_media(
-            title=title, series=filename, local_path=video_path, iteration=i
-        )
+        task.get_logger().report_media(title=title, series=filename, local_path=video_path, iteration=i)

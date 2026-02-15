@@ -46,6 +46,7 @@ This file has been modified from the original robomimic version to integrate wit
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+from datetime import datetime
 
 from isaac_imitation_learning.utils.clearml_utils import (
     add_clearml_args,
@@ -82,9 +83,7 @@ parser.add_argument(
 
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--algo", type=str, default=None, help="Name of the algorithm.")
-parser.add_argument(
-    "--log_dir", type=str, default="robomimic", help="Path to log directory"
-)
+parser.add_argument("--log_dir", type=str, default="robomimic", help="Path to log directory")
 parser.add_argument(
     "--normalize_training_actions",
     action="store_true",
@@ -115,7 +114,7 @@ args_cli = parser.parse_args()
 clearml_task = init_clearml_task(
     args_cli,
     task_type="training",
-    default_task_name=f"train_{args_cli.algo}_{args_cli.task}",
+    default_task_name=f"train_{args_cli.algo}_{args_cli.task}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
 )
 maybe_execute_remotely(clearml_task, args_cli)
 
@@ -164,9 +163,7 @@ from robomimic.utils.log_utils import DataLogger, PrintLogger
 from torch.utils.data import DataLoader
 
 
-def get_env_metadata_from_dataset_isaaclab(
-    dataset_path: str, set_env_specific_obs_processors: bool = True
-) -> dict:
+def get_env_metadata_from_dataset_isaaclab(dataset_path: str, set_env_specific_obs_processors: bool = True) -> dict:
     """Get environment metadata from dataset, handling Isaac Lab format.
 
     Isaac Lab datasets may use 'sim_args' instead of 'env_kwargs'. This function
@@ -231,9 +228,7 @@ def ensure_dataset_cfg_list(dataset_cfg):
     if len(dataset_cfg_list) == 0:
         raise ValueError("config.train.data list is empty.")
     if len(dataset_cfg_list) > 1:
-        raise NotImplementedError(
-            "Multiple datasets are not currently supported in this training script."
-        )
+        raise NotImplementedError("Multiple datasets are not currently supported in this training script.")
     if "path" not in dataset_cfg_list[0]:
         raise KeyError("Dataset config is missing required 'path' key.")
     return dataset_cfg_list
@@ -258,9 +253,7 @@ def normalize_hdf5_actions(config: Config, log_dir: str) -> str:
 
     # Open the new dataset and normalize the actions
     with h5py.File(normalized_path, "r+") as f:
-        dataset_paths = [
-            f"/data/demo_{str(i)}/actions" for i in range(len(f["data"].keys()))
-        ]
+        dataset_paths = [f"/data/demo_{str(i)}/actions" for i in range(len(f["data"].keys()))]
 
         # Compute the min and max of the dataset
         dataset = np.array(f[dataset_paths[0]]).flatten()
@@ -275,9 +268,7 @@ def normalize_hdf5_actions(config: Config, log_dir: str) -> str:
         # Normalize the actions
         for i, path in enumerate(dataset_paths):
             data = np.array(f[path])
-            normalized_data = (
-                2 * ((data - min) / (max - min)) - 1
-            )  # Scale to [-1, 1] range
+            normalized_data = 2 * ((data - min) / (max - min)) - 1  # Scale to [-1, 1] range
             del f[path]
             f[path] = normalized_data
 
@@ -349,12 +340,7 @@ def train(
 
     if config.experiment.env is not None:
         env_meta["env_name"] = config.experiment.env
-        print(
-            "=" * 30
-            + "\n"
-            + "Replacing Env to {}\n".format(env_meta["env_name"])
-            + "=" * 30
-        )
+        print("=" * 30 + "\n" + "Replacing Env to {}\n".format(env_meta["env_name"]) + "=" * 30)
 
     # create environment
     envs = OrderedDict()
@@ -386,9 +372,7 @@ def train(
             config.train.data = [{"path": config.train.data}]
 
     # load training data (must be done before algo_factory in robomimic v0.5.0)
-    trainset, validset = TrainUtils.load_data_for_training(
-        config, obs_keys=shape_meta["all_obs_keys"]
-    )
+    trainset, validset = TrainUtils.load_data_for_training(config, obs_keys=shape_meta["all_obs_keys"])
     train_sampler = trainset.get_dataset_sampler()
     print("\n============= Training Dataset =============")
     logger.info(trainset)
@@ -404,9 +388,7 @@ def train(
                 config.algo.optim_params[k]["num_epochs"] = config.train.num_epochs
 
     # setup for a new training run
-    data_logger = DataLogger(
-        log_dir, config=config, log_tb=config.experiment.logging.log_tb
-    )
+    data_logger = DataLogger(log_dir, config=config, log_tb=config.experiment.logging.log_tb)
     model = algo_factory(
         algo_name=config.algo_name,
         config=config,
@@ -487,9 +469,7 @@ def train(
             )
             epoch_list_check = epoch in config.experiment.save.epochs
             last_epoch_check = epoch == config.train.num_epochs
-            should_save_ckpt = (
-                time_check or epoch_check or epoch_list_check or last_epoch_check
-            )
+            should_save_ckpt = time_check or epoch_check or epoch_list_check or last_epoch_check
         ckpt_reason = None
         if should_save_ckpt:
             last_ckpt_time = time.time()
@@ -524,14 +504,9 @@ def train(
 
             # save checkpoint if achieve new best validation loss
             valid_check = "Loss" in step_log
-            if valid_check and (
-                best_valid_loss is None or (step_log["Loss"] <= best_valid_loss)
-            ):
+            if valid_check and (best_valid_loss is None or (step_log["Loss"] <= best_valid_loss)):
                 best_valid_loss = step_log["Loss"]
-                if (
-                    config.experiment.save.enabled
-                    and config.experiment.save.on_best_validation
-                ):
+                if config.experiment.save.enabled and config.experiment.save.on_best_validation:
                     epoch_ckpt_name += f"_best_validation_{best_valid_loss}"
                     should_save_ckpt = True
                     ckpt_reason = "valid" if ckpt_reason is None else ckpt_reason
@@ -619,9 +594,7 @@ def main(args: argparse.Namespace, clearml_task=None):
         config.train.batch_size = args.batch_size
 
     # change location of experiment directory
-    config.train.output_dir = os.path.abspath(
-        os.path.join("./logs", args.log_dir, args.task)
-    )
+    config.train.output_dir = os.path.abspath(os.path.join("./logs", args.log_dir, args.task))
 
     # Convert dataset config to list format expected by robomimic v0.5.0
     dataset_cfg_list = ensure_dataset_cfg_list(config.train.data)
@@ -635,11 +608,7 @@ def main(args: argparse.Namespace, clearml_task=None):
         datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
     )
     log_dir = os.path.join(base_output_dir, "logs")
-    ckpt_dir = (
-        os.path.join(base_output_dir, "models")
-        if config.experiment.save.enabled
-        else None
-    )
+    ckpt_dir = os.path.join(base_output_dir, "models") if config.experiment.save.enabled else None
     video_dir = os.path.join(base_output_dir, "videos")
     os.makedirs(log_dir)
     if ckpt_dir:
@@ -649,9 +618,7 @@ def main(args: argparse.Namespace, clearml_task=None):
     if args.normalize_training_actions:
         config.train.data = normalize_hdf5_actions(config, log_dir)
         norm_params_path = os.path.join(log_dir, "normalization_params.txt")
-        connect_configuration_file(
-            clearml_task, norm_params_path, "normalization_params"
-        )
+        connect_configuration_file(clearml_task, norm_params_path, "normalization_params")
 
     # get torch device
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)

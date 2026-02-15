@@ -27,6 +27,7 @@ Args:
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+from datetime import datetime
 
 from isaac_imitation_learning.utils.clearml_utils import (
     add_clearml_args,
@@ -41,9 +42,7 @@ from isaac_imitation_learning.utils.clearml_utils import (
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(
-    description="Evaluate robomimic policy for Isaac Lab environment."
-)
+parser = argparse.ArgumentParser(description="Evaluate robomimic policy for Isaac Lab environment.")
 parser.add_argument(
     "--disable_fabric",
     action="store_true",
@@ -63,27 +62,17 @@ parser.add_argument(
     default=100,
     help="Epoch of the checkpoint to start the evaluation from.",
 )
-parser.add_argument(
-    "--horizon", type=int, default=400, help="Step horizon of each rollout."
-)
-parser.add_argument(
-    "--num_rollouts", type=int, default=15, help="Number of rollouts for each setting."
-)
-parser.add_argument(
-    "--num_seeds", type=int, default=3, help="Number of random seeds to evaluate."
-)
-parser.add_argument(
-    "--seeds", nargs="+", type=int, default=None, help="List of specific seeds to use."
-)
+parser.add_argument("--horizon", type=int, default=400, help="Step horizon of each rollout.")
+parser.add_argument("--num_rollouts", type=int, default=15, help="Number of rollouts for each setting.")
+parser.add_argument("--num_seeds", type=int, default=3, help="Number of random seeds to evaluate.")
+parser.add_argument("--seeds", nargs="+", type=int, default=None, help="List of specific seeds to use.")
 parser.add_argument(
     "--log_dir",
     type=str,
     default="/tmp/policy_evaluation_results",
     help="Directory to write results to.",
 )
-parser.add_argument(
-    "--log_file", type=str, default="results", help="Name of output file."
-)
+parser.add_argument("--log_file", type=str, default="results", help="Name of output file.")
 parser.add_argument(
     "--output_vis_file",
     type=str,
@@ -102,9 +91,7 @@ parser.add_argument(
     default=None,
     help="Optional: maximum value of the normalization factor.",
 )
-parser.add_argument(
-    "--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio."
-)
+parser.add_argument("--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio.")
 
 add_clearml_args(parser)
 
@@ -115,7 +102,9 @@ args_cli = parser.parse_args()
 
 # --- ClearML init (before AppLauncher) ---
 clearml_task = init_clearml_task(
-    args_cli, task_type="testing", default_task_name=f"robust_eval_{args_cli.task}"
+    args_cli,
+    task_type="testing",
+    default_task_name=f"robust_eval_{args_cli.task}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
 )
 maybe_execute_remotely(clearml_task, args_cli)
 
@@ -163,9 +152,7 @@ from isaac_imitation_learning.utils.policy_utils import (
 from isaaclab_tasks.utils import parse_env_cfg
 
 
-def rollout(
-    policy, env: gym.Env, success_term, horizon: int, device: torch.device
-) -> tuple[bool, dict]:
+def rollout(policy, env: gym.Env, success_term, horizon: int, device: torch.device) -> tuple[bool, dict]:
     """Perform a single rollout of the policy in the environment.
 
     Args:
@@ -227,19 +214,12 @@ def rollout(
         actions = policy(policy_input)
 
         # Unnormalize actions if normalization factors are provided
-        if (
-            args_cli.norm_factor_min is not None
-            and args_cli.norm_factor_max is not None
-        ):
+        if args_cli.norm_factor_min is not None and args_cli.norm_factor_max is not None:
             actions = (
                 (actions + 1) * (args_cli.norm_factor_max - args_cli.norm_factor_min)
             ) / 2 + args_cli.norm_factor_min
 
-        actions = (
-            torch.from_numpy(actions)
-            .to(device=device)
-            .view(1, env.action_space.shape[1])
-        )
+        actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
 
         # Apply actions
         obs_dict, _, terminated, truncated, _ = env.step(actions)
@@ -287,25 +267,17 @@ def evaluate_model(
     random.seed(seed)
 
     # Load policy
-    policy, _ = FileUtils.policy_from_checkpoint(
-        ckpt_path=model_path, device=device, verbose=False
-    )
+    policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=model_path, device=device, verbose=False)
 
     # Run policy
     results = []
     for trial in range(num_rollouts):
-        logger.info(
-            "[Model: %s] Starting trial %d", os.path.basename(model_path), trial
-        )
+        logger.info("[Model: %s] Starting trial %d", os.path.basename(model_path), trial)
         terminated, _ = rollout(policy, env, success_term, horizon, device)
         results.append(terminated)
         with open(output_file, "a") as file:
-            file.write(
-                f"[Model: {os.path.basename(model_path)}] Trial {trial}: {terminated}\n"
-            )
-        logger.info(
-            "[Model: %s] Trial %d: %s", os.path.basename(model_path), trial, terminated
-        )
+            file.write(f"[Model: {os.path.basename(model_path)}] Trial {trial}: {terminated}\n")
+        logger.info("[Model: %s] Trial %d: %s", os.path.basename(model_path), trial, terminated)
 
     # Calculate and log results
     success_rate = results.count(True) / len(results)
@@ -314,9 +286,7 @@ def evaluate_model(
             f"[Model: {os.path.basename(model_path)}] Successful trials: {results.count(True)}, out of"
             f" {len(results)} trials\n"
         )
-        file.write(
-            f"[Model: {os.path.basename(model_path)}] Success rate: {success_rate}\n"
-        )
+        file.write(f"[Model: {os.path.basename(model_path)}] Success rate: {success_rate}\n")
         file.write(f"[Model: {os.path.basename(model_path)}] Results: {results}\n")
         file.write("-" * 80 + "\n\n")
 
@@ -326,9 +296,7 @@ def evaluate_model(
         results.count(True),
         len(results),
     )
-    logger.info(
-        "[Model: %s] Success rate: %s", os.path.basename(model_path), success_rate
-    )
+    logger.info("[Model: %s] Success rate: %s", os.path.basename(model_path), success_rate)
     logger.info("[Model: %s] Results: %s", os.path.basename(model_path), results)
 
     return success_rate
@@ -367,11 +335,7 @@ def main() -> None:
     model_checkpoints = [f.name for f in os.scandir(args_cli.input_dir) if f.is_file()]
 
     # Set up seeds
-    seeds = (
-        random.sample(range(0, 10000), args_cli.num_seeds)
-        if args_cli.seeds is None
-        else args_cli.seeds
-    )
+    seeds = random.sample(range(0, 10000), args_cli.num_seeds) if args_cli.seeds is None else args_cli.seeds
 
     # Define evaluation settings
     settings = [
@@ -452,9 +416,7 @@ def main() -> None:
                 file.write(f"\nSetting: {setting}\n")
                 for model in results_summary[setting].keys():
                     file.write(f"{model}: {results_summary[setting][model]}\n")
-                max_key = max(
-                    results_summary[setting], key=results_summary[setting].get
-                )
+                max_key = max(results_summary[setting], key=results_summary[setting].get)
                 file.write(
                     f"\nBest model for setting {setting} is {max_key} with success rate"
                     f" {results_summary[setting][max_key]}\n"
@@ -462,9 +424,7 @@ def main() -> None:
 
         # Report evaluation results to ClearML
         report_evaluation_results(clearml_task, results_summary, seed)
-        connect_configuration_file(
-            clearml_task, output_path, f"eval_results_seed_{seed}"
-        )
+        connect_configuration_file(clearml_task, output_path, f"eval_results_seed_{seed}")
 
         env.close()
 

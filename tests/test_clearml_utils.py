@@ -174,7 +174,7 @@ class TestAddClearMLArgs(unittest.TestCase):
         add_clearml_args(self.parser)
         args = self.parser.parse_args([])
 
-        self.assertEqual(args.clearml_project, "IsaacLab/Robomimic")
+        self.assertEqual(args.clearml_project, "Isaac Imitation Learning")
         self.assertIsNone(args.clearml_task_name)
         self.assertEqual(args.clearml_queue, "default")
         self.assertFalse(args.remote)

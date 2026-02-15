@@ -21,6 +21,7 @@ Args:
 
 
 import argparse
+from datetime import datetime
 
 from isaac_imitation_learning.utils.clearml_utils import (
     add_clearml_args,
@@ -34,9 +35,7 @@ from isaac_imitation_learning.utils.clearml_utils import (
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(
-    description="Evaluate robomimic policy for Isaac Lab environment."
-)
+parser = argparse.ArgumentParser(description="Evaluate robomimic policy for Isaac Lab environment.")
 parser.add_argument(
     "--disable_fabric",
     action="store_true",
@@ -44,12 +43,8 @@ parser.add_argument(
     help="Disable fabric and use USD I/O operations.",
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument(
-    "--checkpoint", type=str, default=None, help="Pytorch model checkpoint to load."
-)
-parser.add_argument(
-    "--horizon", type=int, default=800, help="Step horizon of each rollout."
-)
+parser.add_argument("--checkpoint", type=str, default=None, help="Pytorch model checkpoint to load.")
+parser.add_argument("--horizon", type=int, default=800, help="Step horizon of each rollout.")
 parser.add_argument("--num_rollouts", type=int, default=1, help="Number of rollouts.")
 parser.add_argument("--seed", type=int, default=101, help="Random seed.")
 parser.add_argument(
@@ -64,9 +59,7 @@ parser.add_argument(
     default=None,
     help="Optional: maximum value of the normalization factor.",
 )
-parser.add_argument(
-    "--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio."
-)
+parser.add_argument("--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio.")
 
 add_clearml_args(parser)
 
@@ -77,7 +70,9 @@ args_cli = parser.parse_args()
 
 # --- ClearML init (before AppLauncher) ---
 clearml_task = init_clearml_task(
-    args_cli, task_type="testing", default_task_name=f"play_{args_cli.task}"
+    args_cli,
+    task_type="testing",
+    default_task_name=f"play_{args_cli.task}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
 )
 maybe_execute_remotely(clearml_task, args_cli)
 
@@ -190,19 +185,12 @@ def rollout(policy, env, success_term, horizon, device):
         actions = policy(policy_input)
 
         # Unnormalize actions
-        if (
-            args_cli.norm_factor_min is not None
-            and args_cli.norm_factor_max is not None
-        ):
+        if args_cli.norm_factor_min is not None and args_cli.norm_factor_max is not None:
             actions = (
                 (actions + 1) * (args_cli.norm_factor_max - args_cli.norm_factor_min)
             ) / 2 + args_cli.norm_factor_min
 
-        actions = (
-            torch.from_numpy(actions)
-            .to(device=device)
-            .view(1, env.action_space.shape[1])
-        )
+        actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
 
         # Apply actions
         obs_dict, _, terminated, truncated, _ = env.step(actions)
@@ -260,17 +248,13 @@ def main():
     results = []
     for trial in range(args_cli.num_rollouts):
         logger.info("Starting trial %d", trial)
-        policy, _ = FileUtils.policy_from_checkpoint(
-            ckpt_path=args_cli.checkpoint, device=device
-        )
+        policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=args_cli.checkpoint, device=device)
         terminated, traj = rollout(policy, env, success_term, args_cli.horizon, device)
         results.append(terminated)
         logger.info("Trial %d: %s", trial, terminated)
 
     success_rate = results.count(True) / len(results)
-    logger.info(
-        "Successful trials: %d, out of %d trials", results.count(True), len(results)
-    )
+    logger.info("Successful trials: %d, out of %d trials", results.count(True), len(results))
     logger.info("Success rate: %s", success_rate)
     logger.info("Trial Results: %s", results)
 
