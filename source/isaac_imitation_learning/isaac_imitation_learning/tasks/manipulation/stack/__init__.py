@@ -19,7 +19,9 @@ from . import agents
 def _augment_spec(env_id: str, diffusion_json: str, act_json: str) -> None:
     """Augment a gym spec with Diffusion Policy and ACT entry points."""
     spec = gym.spec(env_id)
-    spec.kwargs["robomimic_diffusion_policy_cfg_entry_point"] = f"{agents.__name__}:{diffusion_json}"
+    spec.kwargs["robomimic_diffusion_policy_cfg_entry_point"] = (
+        f"{agents.__name__}:{diffusion_json}"
+    )
     spec.kwargs["robomimic_act_cfg_entry_point"] = f"{agents.__name__}:{act_json}"
 
 

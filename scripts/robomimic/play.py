@@ -34,22 +34,39 @@ from isaac_imitation_learning.utils.clearml_utils import (
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Evaluate robomimic policy for Isaac Lab environment.")
+parser = argparse.ArgumentParser(
+    description="Evaluate robomimic policy for Isaac Lab environment."
+)
 parser.add_argument(
-    "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
+    "--disable_fabric",
+    action="store_true",
+    default=False,
+    help="Disable fabric and use USD I/O operations.",
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--checkpoint", type=str, default=None, help="Pytorch model checkpoint to load.")
-parser.add_argument("--horizon", type=int, default=800, help="Step horizon of each rollout.")
+parser.add_argument(
+    "--checkpoint", type=str, default=None, help="Pytorch model checkpoint to load."
+)
+parser.add_argument(
+    "--horizon", type=int, default=800, help="Step horizon of each rollout."
+)
 parser.add_argument("--num_rollouts", type=int, default=1, help="Number of rollouts.")
 parser.add_argument("--seed", type=int, default=101, help="Random seed.")
 parser.add_argument(
-    "--norm_factor_min", type=float, default=None, help="Optional: minimum value of the normalization factor."
+    "--norm_factor_min",
+    type=float,
+    default=None,
+    help="Optional: minimum value of the normalization factor.",
 )
 parser.add_argument(
-    "--norm_factor_max", type=float, default=None, help="Optional: maximum value of the normalization factor."
+    "--norm_factor_max",
+    type=float,
+    default=None,
+    help="Optional: maximum value of the normalization factor.",
 )
-parser.add_argument("--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio.")
+parser.add_argument(
+    "--enable_pinocchio", default=False, action="store_true", help="Enable Pinocchio."
+)
 
 add_clearml_args(parser)
 
@@ -59,7 +76,9 @@ AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
 # --- ClearML init (before AppLauncher) ---
-clearml_task = init_clearml_task(args_cli, task_type="testing", default_task_name=f"play_{args_cli.task}")
+clearml_task = init_clearml_task(
+    args_cli, task_type="testing", default_task_name=f"play_{args_cli.task}"
+)
 maybe_execute_remotely(clearml_task, args_cli)
 
 # --- Resolve ClearML checkpoint URI (before AppLauncher, no sim needed) ---
@@ -91,14 +110,16 @@ if not logger.handlers:
     logger.addHandler(_handler)
 
 import gymnasium as gym
+import isaac_imitation_learning.tasks  # noqa: F401 - triggers env spec augmentation
 import numpy as np
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.torch_utils as TorchUtils
 import torch
-
-import isaac_imitation_learning.tasks  # noqa: F401 - triggers env spec augmentation
-
-from isaac_imitation_learning.utils.policy_utils import get_observation_horizon, is_action_chunking_policy, stack_observations
+from isaac_imitation_learning.utils.policy_utils import (
+    get_observation_horizon,
+    is_action_chunking_policy,
+    stack_observations,
+)
 
 from isaaclab_tasks.utils import parse_env_cfg
 
@@ -169,12 +190,19 @@ def rollout(policy, env, success_term, horizon, device):
         actions = policy(policy_input)
 
         # Unnormalize actions
-        if args_cli.norm_factor_min is not None and args_cli.norm_factor_max is not None:
+        if (
+            args_cli.norm_factor_min is not None
+            and args_cli.norm_factor_max is not None
+        ):
             actions = (
                 (actions + 1) * (args_cli.norm_factor_max - args_cli.norm_factor_min)
             ) / 2 + args_cli.norm_factor_min
 
-        actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
+        actions = (
+            torch.from_numpy(actions)
+            .to(device=device)
+            .view(1, env.action_space.shape[1])
+        )
 
         # Apply actions
         obs_dict, _, terminated, truncated, _ = env.step(actions)
@@ -196,7 +224,12 @@ def rollout(policy, env, success_term, horizon, device):
 def main():
     """Run a trained policy from robomimic with Isaac Lab environment."""
     # parse configuration
-    env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=1, use_fabric=not args_cli.disable_fabric)
+    env_cfg = parse_env_cfg(
+        args_cli.task,
+        device=args_cli.device,
+        num_envs=1,
+        use_fabric=not args_cli.disable_fabric,
+    )
 
     # Set observations to dictionary mode for Robomimic
     env_cfg.observations.policy.concatenate_terms = False
@@ -227,18 +260,28 @@ def main():
     results = []
     for trial in range(args_cli.num_rollouts):
         logger.info("Starting trial %d", trial)
-        policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=args_cli.checkpoint, device=device)
+        policy, _ = FileUtils.policy_from_checkpoint(
+            ckpt_path=args_cli.checkpoint, device=device
+        )
         terminated, traj = rollout(policy, env, success_term, args_cli.horizon, device)
         results.append(terminated)
         logger.info("Trial %d: %s", trial, terminated)
 
     success_rate = results.count(True) / len(results)
-    logger.info("Successful trials: %d, out of %d trials", results.count(True), len(results))
+    logger.info(
+        "Successful trials: %d, out of %d trials", results.count(True), len(results)
+    )
     logger.info("Success rate: %s", success_rate)
     logger.info("Trial Results: %s", results)
 
     # Report success rate to ClearML
-    report_scalar(clearml_task, title="evaluation", series="success_rate", value=success_rate, iteration=0)
+    report_scalar(
+        clearml_task,
+        title="evaluation",
+        series="success_rate",
+        value=success_rate,
+        iteration=0,
+    )
 
     env.close()
 

@@ -32,7 +32,6 @@ class TestStackCubeIKRelRegistration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import gymnasium as gym
-
         import isaac_imitation_learning  # noqa: F401 - triggers spec augmentation
 
         cls.spec = gym.spec("Isaac-Stack-Cube-Franka-IK-Rel-v0")
@@ -73,7 +72,6 @@ class TestStackCubeIKRelVisuomotorRegistration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import gymnasium as gym
-
         import isaac_imitation_learning  # noqa: F401 - triggers spec augmentation
 
         cls.spec = gym.spec("Isaac-Stack-Cube-Franka-IK-Rel-Visuomotor-v0")
