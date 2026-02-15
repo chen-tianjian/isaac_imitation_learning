@@ -94,6 +94,13 @@ parser.add_argument(
     ),
 )
 
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=None,
+    help="Optional: Batch size for training. If specified, overrides the batch size from the JSON training config.",
+)
+
 add_clearml_args(parser)
 args_cli = parser.parse_args()
 
@@ -557,6 +564,9 @@ def main(args: argparse.Namespace, clearml_task=None):
 
     if args.epochs is not None:
         config.train.num_epochs = args.epochs
+
+    if args.batch_size is not None:
+        config.train.batch_size = args.batch_size
 
     # change location of experiment directory
     config.train.output_dir = os.path.abspath(os.path.join("./logs", args.log_dir, args.task))
