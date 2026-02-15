@@ -13,11 +13,19 @@ when the "setup_python_env.sh" is run as part of the vs-code launch configuratio
 """
 
 import argparse
+import logging
 import os
 import pathlib
 import platform
 import re
 import sys
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 PROJECT_DIR = pathlib.Path(__file__).parents[2]
 """Path to the the project directory."""
@@ -41,9 +49,9 @@ except ModuleNotFoundError or ImportError:
             " installation."
         )
 except EOFError:
-    print("Unable to trigger EULA acceptance. This is likely due to the script being run in a non-interactive shell.")
-    print("Please run the script in an interactive shell to accept the EULA.")
-    print("Skipping the setup of the VSCode settings...")
+    logger.warning("Unable to trigger EULA acceptance. This is likely due to the script being run in a non-interactive shell.")
+    logger.warning("Please run the script in an interactive shell to accept the EULA.")
+    logger.warning("Skipping the setup of the VSCode settings...")
     sys.exit(0)
 
 # check if the isaac-sim directory exists
@@ -102,12 +110,13 @@ def overwrite_python_analysis_extra_paths(isaaclab_settings: str) -> str:
         path_names = ['"${workspaceFolder}/' + rel_path + "/" + path_name + '"' for path_name in path_names]
     else:
         path_names = []
-        print(
-            f"[WARN] Could not find Isaac Sim VSCode settings: {isaacsim_vscode_filename}."
+        logger.warning(
+            "Could not find Isaac Sim VSCode settings: %s."
             "\n\tThis will result in missing 'python.analysis.extraPaths' in the VSCode"
             "\n\tsettings, which limits the functionality of the Python language server."
             "\n\tHowever, it does not affect the functionality of the Isaac Lab project."
-            "\n\tWe are working on a fix for this issue with the Isaac Sim team."
+            "\n\tWe are working on a fix for this issue with the Isaac Sim team.",
+            isaacsim_vscode_filename,
         )
 
     # add the path names that are in the Isaac Lab extensions directory

@@ -97,10 +97,18 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import copy
+import logging
 import os
 import pathlib
 import random
 from collections import deque
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 import gymnasium as gym
 import robomimic.utils.file_utils as FileUtils
@@ -233,12 +241,12 @@ def evaluate_model(
     # Run policy
     results = []
     for trial in range(num_rollouts):
-        print(f"[Model: {os.path.basename(model_path)}] Starting trial {trial}")
+        logger.info("[Model: %s] Starting trial %d", os.path.basename(model_path), trial)
         terminated, _ = rollout(policy, env, success_term, horizon, device)
         results.append(terminated)
         with open(output_file, "a") as file:
             file.write(f"[Model: {os.path.basename(model_path)}] Trial {trial}: {terminated}\n")
-        print(f"[Model: {os.path.basename(model_path)}] Trial {trial}: {terminated}")
+        logger.info("[Model: %s] Trial %d: %s", os.path.basename(model_path), trial, terminated)
 
     # Calculate and log results
     success_rate = results.count(True) / len(results)
@@ -251,12 +259,12 @@ def evaluate_model(
         file.write(f"[Model: {os.path.basename(model_path)}] Results: {results}\n")
         file.write("-" * 80 + "\n\n")
 
-    print(
-        f"\n[Model: {os.path.basename(model_path)}] Successful trials: {results.count(True)}, out of"
-        f" {len(results)} trials"
+    logger.info(
+        "[Model: %s] Successful trials: %d, out of %d trials",
+        os.path.basename(model_path), results.count(True), len(results),
     )
-    print(f"[Model: {os.path.basename(model_path)}] Success rate: {success_rate}\n")
-    print(f"[Model: {os.path.basename(model_path)}] Results: {results}\n")
+    logger.info("[Model: %s] Success rate: %s", os.path.basename(model_path), success_rate)
+    logger.info("[Model: %s] Results: %s", os.path.basename(model_path), results)
 
     return success_rate
 
@@ -319,7 +327,7 @@ def main() -> None:
                 file.write(f"Evaluation setting: {setting}\n")
                 file.write("=" * 80 + "\n\n")
 
-                print(f"Evaluation setting: {setting}")
+                logger.info("Evaluation setting: %s", setting)
                 print("=" * 80)
 
                 # Evaluate each model

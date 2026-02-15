@@ -29,8 +29,17 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
+import logging
+
 import gymnasium as gym
 import torch
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
@@ -48,8 +57,8 @@ def main():
     env = gym.make(args_cli.task, cfg=env_cfg)
 
     # print info (this is vectorized environment)
-    print(f"[INFO]: Gym observation space: {env.observation_space}")
-    print(f"[INFO]: Gym action space: {env.action_space}")
+    logger.info("Gym observation space: %s", env.observation_space)
+    logger.info("Gym action space: %s", env.action_space)
     # reset environment
     env.reset()
     # simulate environment

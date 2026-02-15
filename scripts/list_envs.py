@@ -32,8 +32,17 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
+import logging
+
 import gymnasium as gym
 from prettytable import PrettyTable
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 import isaac_imitation_learning.tasks  # noqa: F401
 
@@ -58,7 +67,7 @@ def main():
             # increment count
             index += 1
 
-    print(table)
+    logger.info("\n%s", table)
 
 
 if __name__ == "__main__":

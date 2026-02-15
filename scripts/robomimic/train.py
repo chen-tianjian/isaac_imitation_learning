@@ -115,12 +115,20 @@ simulation_app = app_launcher.app
 import datetime
 import importlib
 import json
+import logging
 import os
 import shutil
 import sys
 import time
 import traceback
 from collections import OrderedDict
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 import gymnasium as gym
 import h5py
@@ -226,7 +234,7 @@ def normalize_hdf5_actions(config: Config, log_dir: str) -> str:
     normalized_path = base + "_normalized" + ext
 
     # Copy the original dataset
-    print(f"Creating normalized dataset at {normalized_path}")
+    logger.info("Creating normalized dataset at %s", normalized_path)
     shutil.copyfile(config.train.data, normalized_path)
 
     # Open the new dataset and normalize the actions
@@ -274,18 +282,16 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
     torch.manual_seed(config.train.seed)
 
     print("\n============= New Training Run with Config =============")
-    print(config)
-    print("")
-
-    print(f">>> Saving logs into directory: {log_dir}")
-    print(f">>> Saving checkpoints into directory: {ckpt_dir}")
-    print(f">>> Saving videos into directory: {video_dir}")
+    logger.info(config)
+    logger.info(">>> Saving logs into directory: %s", log_dir)
+    logger.info(">>> Saving checkpoints into directory: %s", ckpt_dir)
+    logger.info(">>> Saving videos into directory: %s", video_dir)
 
     if config.experiment.logging.terminal_output_to_txt:
         # log stdout and stderr to a text file
-        logger = PrintLogger(os.path.join(log_dir, "log.txt"))
-        sys.stdout = logger
-        sys.stderr = logger
+        print_logger = PrintLogger(os.path.join(log_dir, "log.txt"))
+        sys.stdout = print_logger
+        sys.stderr = print_logger
 
     # read config to set up metadata for observation modalities (e.g. detecting rgb observations)
     ObsUtils.initialize_obs_utils_with_config(config)
@@ -331,7 +337,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
                 use_image_obs=shape_meta["use_images"],
             )
             envs[env.name] = env
-            print(envs[env.name])
+            logger.info(envs[env.name])
 
     print("")
 
@@ -345,8 +351,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
     trainset, validset = TrainUtils.load_data_for_training(config, obs_keys=shape_meta["all_obs_keys"])
     train_sampler = trainset.get_dataset_sampler()
     print("\n============= Training Dataset =============")
-    print(trainset)
-    print("")
+    logger.info(trainset)
 
     # robomimic v0.5.0 requires num_train_batches and num_epochs in optim_params for LR scheduler
     train_num_steps = config.experiment.epoch_every_n_steps
@@ -375,8 +380,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
     connect_configuration_file(clearml_task, config_json_path, "robomimic_config_file")
 
     print("\n============= Model Summary =============")
-    print(model)  # print model summary
-    print("")
+    logger.info(model)
 
     # maybe retrieve statistics for normalizing observations
     obs_normalization_stats = None
@@ -442,8 +446,8 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
             last_ckpt_time = time.time()
             ckpt_reason = "time"
 
-        print(f"Train Epoch {epoch}")
-        print(json.dumps(step_log, sort_keys=True, indent=4))
+        logger.info("Train Epoch %d", epoch)
+        logger.info(json.dumps(step_log, sort_keys=True, indent=4))
         for k, v in step_log.items():
             if k.startswith("Time_"):
                 data_logger.record(f"Timing_Stats/Train_{k[5:]}", v, epoch)
@@ -462,8 +466,8 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
                 else:
                     data_logger.record(f"Valid/{k}", v, epoch)
 
-            print(f"Validation Epoch {epoch}")
-            print(json.dumps(step_log, sort_keys=True, indent=4))
+            logger.info("Validation Epoch %d", epoch)
+            logger.info(json.dumps(step_log, sort_keys=True, indent=4))
 
             # save checkpoint if achieve new best validation loss
             valid_check = "Loss" in step_log
@@ -491,7 +495,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
         process = psutil.Process(os.getpid())
         mem_usage = int(process.memory_info().rss / 1000000)
         data_logger.record("System/RAM Usage (MB)", mem_usage, epoch)
-        print(f"\nEpoch {epoch} Memory Usage: {mem_usage} MB\n")
+        logger.info("Epoch %d Memory Usage: %d MB", epoch, mem_usage)
 
     # terminate logging
     data_logger.close()
@@ -513,9 +517,8 @@ def main(args: argparse.Namespace, clearml_task=None):
         cfg_entry_point_key = f"robomimic_{args.algo}_cfg_entry_point"
         task_name = args.task.split(":")[-1]
 
-        print(f"Loading configuration for task: {task_name}")
-        print(gym.envs.registry.keys())
-        print(" ")
+        logger.info("Loading configuration for task: %s", task_name)
+        logger.debug("Registered environments: %s", gym.envs.registry.keys())
         cfg_entry_point_file = gym.spec(task_name).kwargs.pop(cfg_entry_point_key)
         # check if entry point exists
         if cfg_entry_point_file is None:
@@ -592,7 +595,7 @@ def main(args: argparse.Namespace, clearml_task=None):
         train(config, device, log_dir, ckpt_dir, video_dir, clearml_task=clearml_task)
     except Exception as e:
         res_str = f"run failed with error:\n{e}\n\n{traceback.format_exc()}"
-    print(res_str)
+    logger.info(res_str)
 
 
 if __name__ == "__main__":

@@ -79,8 +79,16 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import copy
+import logging
 import random
 from collections import deque
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 import gymnasium as gym
 import numpy as np
@@ -117,7 +125,7 @@ def rollout(policy, env, success_term, horizon, device):
     if use_frame_stacking:
         obs_horizon = get_observation_horizon(policy)
         obs_queue = deque(maxlen=obs_horizon)
-        print(f"[INFO] Using diffusion policy with observation_horizon={obs_horizon}")
+        logger.info("Using diffusion policy with observation_horizon=%d", obs_horizon)
     else:
         obs_queue = None
 
@@ -218,16 +226,16 @@ def main():
     # Run policy
     results = []
     for trial in range(args_cli.num_rollouts):
-        print(f"[INFO] Starting trial {trial}")
+        logger.info("Starting trial %d", trial)
         policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=args_cli.checkpoint, device=device)
         terminated, traj = rollout(policy, env, success_term, args_cli.horizon, device)
         results.append(terminated)
-        print(f"[INFO] Trial {trial}: {terminated}\n")
+        logger.info("Trial %d: %s", trial, terminated)
 
     success_rate = results.count(True) / len(results)
-    print(f"\nSuccessful trials: {results.count(True)}, out of {len(results)} trials")
-    print(f"Success rate: {success_rate}")
-    print(f"Trial Results: {results}\n")
+    logger.info("Successful trials: %d, out of %d trials", results.count(True), len(results))
+    logger.info("Success rate: %s", success_rate)
+    logger.info("Trial Results: %s", results)
 
     # Report success rate to ClearML
     report_scalar(clearml_task, title="evaluation", series="success_rate", value=success_rate, iteration=0)

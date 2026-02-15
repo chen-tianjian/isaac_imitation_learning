@@ -18,10 +18,18 @@ Key features:
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
 import tempfile
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_handler)
 
 # Lazy-loaded ClearML classes (set by resolve/upload functions when needed)
 Task = None
@@ -56,7 +64,7 @@ def is_clearml_configured() -> bool:
             _clearml_configured = False
 
         if not _clearml_configured and not _clearml_info_shown:
-            print("[ClearML] Not configured (Run 'clearml-init' to enable experiment tracking). Only saving logs locally.")
+            logger.info("Not configured (Run 'clearml-init' to enable experiment tracking). Only saving logs locally.")
             _clearml_info_shown = True
     return _clearml_configured
 
@@ -152,7 +160,7 @@ def init_clearml_task(args, task_type: str, default_task_name: str):
         )
         return task
     except Exception as e:
-        print(f"[ClearML] Warning: Failed to initialize ClearML task: {e}")
+        logger.warning("Failed to initialize ClearML task: %s", e)
         return None
 
 
@@ -169,7 +177,7 @@ def maybe_execute_remotely(task, args):
     if task is None or not getattr(args, "remote", False):
         return
     queue_name = getattr(args, "clearml_queue", "default")
-    print(f"[ClearML] Sending task to queue '{queue_name}' for remote execution...")
+    logger.info("Sending task to queue '%s' for remote execution...", queue_name)
     task.execute_remotely(queue_name=queue_name, exit_process=True)
 
 
@@ -391,6 +399,7 @@ def upload_checkpoint(task, ckpt_path: str):
     if task is None:
         return
     name = os.path.basename(ckpt_path)
+    logger.info(f"Uploading checkpoint {name} as a ClearML artifact...")
     task.upload_artifact(name=name, artifact_object=ckpt_path)
 
 
@@ -455,13 +464,12 @@ def report_evaluation_results(task, results_summary: dict, seed: int):
     if task is None:
         return
 
-    logger = task.get_logger()
     for setting, model_results in results_summary.items():
         if not model_results:
             continue
         best_model = max(model_results, key=model_results.get)
         best_rate = model_results[best_model]
-        logger.report_scalar(title=f"eval_seed_{seed}", series=setting, value=best_rate, iteration=0)
+        task.get_logger().report_scalar(title=f"eval_seed_{seed}", series=setting, value=best_rate, iteration=0)
 
     # Upload full results as artifact
     task.upload_artifact(name=f"eval_results_seed_{seed}", artifact_object=results_summary)
@@ -496,7 +504,6 @@ def upload_videos_from_dir(task, video_dir: str, title: str):
         return
 
     mp4_files = sorted(f for f in os.listdir(video_dir) if f.endswith(".mp4"))
-    logger = task.get_logger()
     for i, filename in enumerate(mp4_files):
         video_path = os.path.join(video_dir, filename)
-        logger.report_media(title=title, series=filename, local_path=video_path, iteration=i)
+        task.get_logger().report_media(title=title, series=filename, local_path=video_path, iteration=i)
