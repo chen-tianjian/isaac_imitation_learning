@@ -9,13 +9,14 @@ Isaac Imitation Learning is an Isaac Lab extension for training and evaluating i
 ## Common Commands
 
 ### Installation
-```bash
-# With pip
-pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
 
-# With uv (index URLs are read from pyproject.toml)
+Only `uv` is supported for environment and dependency management (not virtualenv or conda).
+
+```bash
 uv pip install -e .
 ```
+
+Index URLs are configured in `pyproject.toml`, so no extra flags are needed.
 
 ### Training
 ```bash
@@ -71,7 +72,7 @@ python -m pytest tests/test_clearml_utils.py -v  # Single test file
 
 ### Code Formatting
 ```bash
-pip install pre-commit
+uv pip install pre-commit
 pre-commit run --all-files
 ```
 

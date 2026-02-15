@@ -15,27 +15,11 @@ This Isaac Lab extension trains and evaluates imitation learning policies in GPU
     cd isaac_imitation_learning
     ```
 
-2. Create a Python 3.11 virtual environment and install (select one way below):
-
-    **virtualenv / venv**
+2. Create a Python 3.11 virtual environment and install via uv:
     ```bash
-    python3.11 -m venv .venv
-    source .venv/bin/activate
-    pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
-    ```
-
-    **uv**
-    ```bash
-    uv venv --python 3.11 --seed
+    uv venv --python 3.11
     source .venv/bin/activate
     uv pip install -e .
-    ```
-
-    **conda**
-    ```bash
-    conda create -n isaac python=3.11 -y
-    conda activate isaac
-    pip install -e . --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
     ```
 
 3. (Optional) Set up ClearML for experiment tracking:
@@ -128,6 +112,33 @@ python -m pytest tests/ -v
 ```
 
 Tests run without Isaac Sim or ClearML credentials.
+
+## Troubleshooting
+
+### Installation Error: `ModuleNotFoundError: No module named 'pkg_resources'`
+
+**Symptom**: Installation fails when building `flatdict` with error:
+```
+ModuleNotFoundError: No module named 'pkg_resources'
+```
+
+**Cause**: Occurs with Python 3.11 from deadsnakes PPA when setuptools is not fully initialized.
+
+**Solution 1 - Upgrade setuptools and disable build isolation** (if using venv):
+```bash
+source .venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -e . --no-build-isolation --extra-index-url https://pypi.nvidia.com --extra-index-url https://download.pytorch.org/whl/cu128
+```
+
+**Solution 2 - Use uv** (recommended alternative):
+```bash
+uv venv --python 3.11 --seed
+source .venv/bin/activate
+uv pip install -e .
+```
+
+The `uv` installation method handles this automatically via better dependency resolution.
 
 ## License
 
