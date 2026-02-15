@@ -51,6 +51,7 @@ from isaac_imitation_learning.utils.clearml_utils import (
     add_clearml_args,
     close_clearml_task,
     connect_configuration_file,
+    connect_hyperparameters,
     init_clearml_task,
     maybe_execute_remotely,
     resolve_dataset,
@@ -588,6 +589,9 @@ def main(args: argparse.Namespace, clearml_task=None):
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
 
     config.lock()
+
+    # Connect algorithm hyperparameters to ClearML
+    connect_hyperparameters(clearml_task, config.algo.to_dict(), name="AlgoConfig")
 
     # catch error during training and print it
     res_str = "finished run successfully!"

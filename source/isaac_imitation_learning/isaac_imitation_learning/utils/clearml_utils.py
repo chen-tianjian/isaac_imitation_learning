@@ -155,9 +155,10 @@ def init_clearml_task(args, task_type: str, default_task_name: str):
             project_name=getattr(args, "clearml_project", "IsaacLab/Robomimic"),
             task_name=task_name,
             task_type=task_type,
-            auto_connect_arg_parser=True,
+            auto_connect_arg_parser=False,
             auto_connect_frameworks={"tensorboard": True},
         )
+        task.connect(vars(args), name="Args")
         return task
     except Exception as e:
         logger.warning("Failed to initialize ClearML task: %s", e)
@@ -433,6 +434,19 @@ def connect_configuration_file(task, file_path: str, name: str):
     if task is None:
         return
     task.connect_configuration(file_path, name=name)
+
+
+def connect_hyperparameters(task, params_dict: dict, name: str):
+    """Connect a dictionary as hyperparameters to a ClearML Task.
+
+    Args:
+        task: ClearML Task instance (or None for no-op).
+        params_dict: Dictionary of hyperparameters.
+        name: Section name in ClearML Hyperparameters tab.
+    """
+    if task is None:
+        return
+    task.connect(params_dict, name=name)
 
 
 def report_scalar(task, title: str, series: str, value: float, iteration: int):
