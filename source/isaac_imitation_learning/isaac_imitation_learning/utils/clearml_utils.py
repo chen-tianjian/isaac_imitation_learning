@@ -180,6 +180,21 @@ def maybe_execute_remotely(task, args):
     task.execute_remotely(queue_name=queue_name, exit_process=True)
 
 
+def mark_clearml_task_failed(task, status_message: str | None = None):
+    """Mark a ClearML Task as failed.
+
+    Should be called when an unrecoverable error occurs during execution,
+    before calling close_clearml_task().
+
+    Args:
+        task: ClearML Task instance (or None for no-op).
+        status_message: Optional message describing the failure.
+    """
+    if task is None:
+        return
+    task.mark_failed(status_message=status_message)
+
+
 def close_clearml_task(task):
     """Explicitly close and finalize a ClearML Task.
 

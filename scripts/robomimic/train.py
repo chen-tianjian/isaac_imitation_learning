@@ -54,6 +54,7 @@ from isaac_imitation_learning.utils.clearml_utils import (
     connect_configuration_file,
     connect_hyperparameters,
     init_clearml_task,
+    mark_clearml_task_failed,
     maybe_execute_remotely,
     resolve_dataset,
     upload_checkpoint,
@@ -634,6 +635,7 @@ def main(args: argparse.Namespace, clearml_task=None):
         train(config, device, log_dir, ckpt_dir, video_dir, clearml_task=clearml_task)
     except Exception as e:
         res_str = f"run failed with error:\n{e}\n\n{traceback.format_exc()}"
+        mark_clearml_task_failed(clearml_task, status_message=str(e))
     logger.info(res_str)
 
 
