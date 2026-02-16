@@ -25,12 +25,12 @@
         "render": false,
         "render_video": true,
         "keep_all_videos": false,
-        "video_skip": 5,
+        "video_skip": 1,
         "rollout": {
             "enabled": false,
-            "n": 50,
+            "n": 3,
             "horizon": 200,
-            "rate": 50,
+            "rate": 100,
             "warmstart": 0,
             "terminate_on_success": true
         },

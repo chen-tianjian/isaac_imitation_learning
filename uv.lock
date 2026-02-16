@@ -2258,7 +2258,7 @@ wheels = [
 [[package]]
 name = "robomimic"
 version = "0.5.0"
-source = { git = "https://github.com/chen-tianjian/robomimic.git?rev=act#b7ce1c5a2aef1bc0773346ea8f15949757e62037" }
+source = { git = "https://github.com/chen-tianjian/robomimic.git?rev=act#7022ba672d782faaf3d50951cbbb81907daee5fb" }
 dependencies = [
     { name = "diffusers" },
     { name = "egl-probe" },

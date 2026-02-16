@@ -108,6 +108,13 @@ parser.add_argument(
     help="Optional: Batch size for training. If specified, overrides the batch size from the JSON training config.",
 )
 
+parser.add_argument(
+    "--video",
+    action="store_true",
+    default=False,
+    help="Enable rollout evaluation with video recording during training. Overrides experiment.rollout.enabled.",
+)
+
 add_clearml_args(parser)
 args_cli = parser.parse_args()
 
@@ -124,11 +131,12 @@ if args_cli.dataset is not None:
     args_cli.dataset = resolve_dataset(args_cli.dataset)
 
 # launch omniverse app
-app_launcher = AppLauncher(headless=True)
+app_launcher = AppLauncher(headless=True, enable_cameras=args_cli.video)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
+import copy
 import datetime
 import importlib
 import json
@@ -138,7 +146,9 @@ import shutil
 import sys
 import time
 import traceback
-from collections import OrderedDict
+from collections import deque
+
+import imageio
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -158,10 +168,17 @@ import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.train_utils as TrainUtils
 import torch
-from robomimic.algo import algo_factory
+from isaac_imitation_learning.utils.policy_utils import (
+    get_observation_horizon,
+    is_action_chunking_policy,
+    stack_observations,
+)
+from robomimic.algo import RolloutPolicy, algo_factory
 from robomimic.config import Config, config_factory
 from robomimic.utils.log_utils import DataLogger, PrintLogger
 from torch.utils.data import DataLoader
+
+from isaaclab_tasks.utils import parse_env_cfg
 
 
 def get_env_metadata_from_dataset_isaaclab(dataset_path: str, set_env_specific_obs_processors: bool = True) -> dict:
@@ -281,12 +298,181 @@ def normalize_hdf5_actions(config: Config, log_dir: str) -> str:
     return normalized_path
 
 
+def run_rollout_isaac_lab(
+    policy, env, success_term, horizon, device, video_skip=5, render_video=False, terminate_on_success=False
+):
+    """Run a single rollout episode in an Isaac Lab environment.
+
+    Adapted from play.py:rollout() with video frame capture support.
+
+    Args:
+        policy: RolloutPolicy instance wrapping the trained model.
+        env: Isaac Lab environment (unwrapped gymnasium env).
+        success_term: Success termination term extracted from env config.
+        horizon: Maximum number of steps per episode.
+        device: Torch device for action tensors.
+        video_skip: Capture one video frame every this many steps.
+        render_video: Whether to capture video frames.
+
+    Returns:
+        results: Dict with keys "Return", "Horizon", "Success_Rate".
+        video_frames: List of numpy arrays (H, W, 3) uint8, or empty list.
+    """
+    policy.start_episode()
+    obs_dict, _ = env.reset()
+
+    # Set up frame stacking for action-chunking policies (ACT, Diffusion Policy)
+    use_frame_stacking = is_action_chunking_policy(policy)
+    obs_horizon = get_observation_horizon(policy) if use_frame_stacking else 1
+    obs_queue = deque(maxlen=obs_horizon)
+
+    video_frames = []
+    total_reward = 0.0
+    success = False
+
+    for step_i in range(horizon):
+        # Convert Isaac Lab tensors to numpy dicts for robomimic
+        obs = {}
+        for ob in obs_dict["policy"]:
+            obs[ob] = obs_dict["policy"][ob].squeeze(0).cpu().numpy()
+
+        # Normalize image observations (uint8 [0,255] -> float [0,1])
+        if hasattr(env.cfg, "image_obs_list"):
+            for image_name in env.cfg.image_obs_list:
+                if image_name in obs_dict["policy"]:
+                    image = obs_dict["policy"][image_name].squeeze(0).clone().float()
+                    image = image / 255.0
+                    image = image.clip(0.0, 1.0)
+                    obs[image_name] = image.cpu().numpy()
+
+        # Frame stacking for action-chunking policies
+        if use_frame_stacking:
+            if len(obs_queue) == 0:
+                for _ in range(obs_horizon):
+                    obs_queue.append(copy.deepcopy(obs))
+            else:
+                obs_queue.append(copy.deepcopy(obs))
+            policy_input = stack_observations(obs_queue, obs.keys())
+        else:
+            policy_input = obs
+
+        # Compute and apply actions
+        actions = policy(policy_input)
+        actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
+        obs_dict, reward, terminated, truncated, _ = env.step(actions)
+        total_reward += float(reward)
+
+        # Capture video frame from viewport camera
+        if render_video and step_i % video_skip == 0:
+            frame = env.render()
+            if frame is not None:
+                video_frames.append(frame)
+
+        # Check success
+        if bool(success_term.func(env, **success_term.params)[0]):
+            success = True
+            if terminate_on_success:
+                break
+        if terminated or truncated:
+            break
+
+    num_steps = step_i + 1
+    results = {
+        "Return": total_reward,
+        "Horizon": num_steps,
+        "Success_Rate": 1.0 if success else 0.0,
+    }
+    return results, video_frames
+
+
+def run_rollouts_with_stats(
+    policy,
+    env,
+    success_term,
+    horizon,
+    device,
+    num_episodes,
+    video_dir=None,
+    epoch=None,
+    video_skip=5,
+    terminate_on_success=False,
+    render_video=False,
+):
+    """Run multiple rollout episodes and aggregate stats.
+
+    Args:
+        policy: RolloutPolicy instance.
+        env: Isaac Lab environment.
+        success_term: Success termination term.
+        horizon: Max steps per episode.
+        device: Torch device.
+        num_episodes: Number of episodes to run.
+        video_dir: Directory to save video files (None to skip).
+        epoch: Current epoch number (for video filename).
+        video_skip: Capture one frame every this many steps.
+        terminate_on_success: Whether to stop episode on success.
+        render_video: Whether to record video.
+
+    Returns:
+        all_rollout_logs: Dict like {"env_name": {"Return": ..., "Horizon": ..., "Success_Rate": ...}}.
+    """
+    env_name = env.cfg.__class__.__name__
+    all_results = []
+
+    video_writer = None
+    if render_video and video_dir is not None:
+        video_filename = f"{env_name}_epoch_{epoch}.mp4" if epoch is not None else f"{env_name}.mp4"
+        video_path = os.path.join(video_dir, video_filename)
+        video_writer = imageio.get_writer(video_path, fps=20)
+
+    for ep_i in range(num_episodes):
+        # Only capture video for the first episode
+        capture_video = render_video and (ep_i == 0)
+        results, video_frames = run_rollout_isaac_lab(
+            policy=policy,
+            env=env,
+            success_term=success_term,
+            horizon=horizon,
+            device=device,
+            video_skip=video_skip,
+            render_video=capture_video,
+            terminate_on_success=terminate_on_success,
+        )
+        all_results.append(results)
+
+        # Write video frames
+        if video_writer is not None and video_frames:
+            for frame in video_frames:
+                video_writer.append_data(frame)
+
+        logger.info(
+            "  Episode %d/%d: Horizon=%d, Return=%.3f, Success=%s",
+            ep_i + 1,
+            num_episodes,
+            results["Horizon"],
+            results["Return"],
+            bool(results["Success_Rate"]),
+        )
+
+    if video_writer is not None:
+        video_writer.close()
+        logger.info("Saved rollout video to %s", video_path)
+
+    # Aggregate stats across episodes
+    avg_results = {}
+    for key in all_results[0]:
+        avg_results[key] = np.mean([r[key] for r in all_results])
+
+    return {env_name: avg_results}
+
+
 def train(
     config: Config,
     device: str,
     log_dir: str,
-    ckpt_dir: str,
+    ckpt_dir: str | None,
     video_dir: str,
+    task_name: str,
     clearml_task=None,
 ):
     """Train a model using the algorithm specified in config.
@@ -297,6 +483,7 @@ def train(
         log_dir: Directory to save logs.
         ckpt_dir: Directory to save checkpoints.
         video_dir: Directory to save videos.
+        task_name: Registered gymnasium environment name (e.g. Isaac-Stack-Cube-Franka-IK-Rel-Visuomotor-v0).
         clearml_task: ClearML Task instance (or None if ClearML is disabled/unavailable).
     """
     # first set seeds
@@ -343,26 +530,19 @@ def train(
         env_meta["env_name"] = config.experiment.env
         print("=" * 30 + "\n" + "Replacing Env to {}\n".format(env_meta["env_name"]) + "=" * 30)
 
-    # create environment
-    envs = OrderedDict()
+    # Create Isaac Lab rollout environment (if rollouts are enabled)
+    rollout_env = None
+    success_term = None
     if config.experiment.rollout.enabled:
-        # create environments for validation runs
-        env_names = [env_meta["env_name"]]
-
-        if config.experiment.additional_envs is not None:
-            for name in config.experiment.additional_envs:
-                env_names.append(name)
-
-        for env_name in env_names:
-            env = EnvUtils.create_env_from_metadata(
-                env_meta=env_meta,
-                env_name=env_name,
-                render=False,
-                render_offscreen=config.experiment.render_video,
-                use_image_obs=shape_meta["use_images"],
-            )
-            envs[env.name] = env
-            logger.info(envs[env.name])
+        logger.info("Creating rollout environment: %s", task_name)
+        env_cfg = parse_env_cfg(task_name, device=str(device), num_envs=1)
+        env_cfg.observations.policy.concatenate_terms = False
+        env_cfg.terminations.time_out = None
+        env_cfg.recorders = None
+        success_term = env_cfg.terminations.success
+        env_cfg.terminations.success = None
+        rollout_env = gym.make(task_name, cfg=env_cfg, render_mode="rgb_array").unwrapped
+        logger.info("Rollout environment created: %s", task_name)
 
     print("")
 
@@ -439,6 +619,12 @@ def train(
 
     # main training loop
     best_valid_loss = None
+    best_return = {}
+    best_success_rate = {}
+    if config.experiment.rollout.enabled:
+        rollout_env_name = rollout_env.cfg.__class__.__name__
+        best_return[rollout_env_name] = -np.inf
+        best_success_rate[rollout_env_name] = -np.inf
     last_ckpt_time = time.time()
 
     # number of learning steps per epoch (defaults to a full dataset pass)
@@ -512,8 +698,54 @@ def train(
                     should_save_ckpt = True
                     ckpt_reason = "valid" if ckpt_reason is None else ckpt_reason
 
+        # Run rollout evaluation
+        if (
+            config.experiment.rollout.enabled
+            and epoch >= config.experiment.rollout.warmstart
+            and epoch % config.experiment.rollout.rate == 0
+        ):
+            logger.info("Running rollout evaluation at epoch %d...", epoch)
+            rollout_policy = RolloutPolicy(model, obs_normalization_stats=obs_normalization_stats)
+            with torch.no_grad():
+                all_rollout_logs = run_rollouts_with_stats(
+                    policy=rollout_policy,
+                    env=rollout_env,
+                    success_term=success_term,
+                    horizon=config.experiment.rollout.horizon,
+                    device=device,
+                    num_episodes=config.experiment.rollout.n,
+                    video_dir=video_dir if config.experiment.render_video else None,
+                    epoch=epoch,
+                    video_skip=config.experiment.video_skip,
+                    terminate_on_success=config.experiment.rollout.terminate_on_success,
+                    render_video=config.experiment.render_video,
+                )
+            model.set_train()  # restore training mode
+
+            # Log rollout stats
+            for env_name in all_rollout_logs:
+                for k, v in all_rollout_logs[env_name].items():
+                    data_logger.record(f"Rollout/{k}", v, epoch)
+                logger.info("Rollout Epoch %d: %s", epoch, json.dumps(all_rollout_logs[env_name]))
+
+            # Update checkpoint logic from rollout results
+            save_info = TrainUtils.should_save_from_rollout_logs(
+                all_rollout_logs=all_rollout_logs,
+                best_return=best_return,
+                best_success_rate=best_success_rate,
+                epoch_ckpt_name=epoch_ckpt_name,
+                save_on_best_rollout_return=config.experiment.save.on_best_rollout_return,
+                save_on_best_rollout_success_rate=config.experiment.save.on_best_rollout_success_rate,
+            )
+            best_return = save_info["best_return"]
+            best_success_rate = save_info["best_success_rate"]
+            epoch_ckpt_name = save_info["epoch_ckpt_name"]
+            if save_info["should_save_ckpt"]:
+                should_save_ckpt = True
+                ckpt_reason = save_info["ckpt_reason"] if ckpt_reason is None else ckpt_reason
+
         # Save model checkpoints based on conditions (success rate, validation loss, etc)
-        if should_save_ckpt:
+        if should_save_ckpt and ckpt_dir is not None:
             ckpt_path = os.path.join(ckpt_dir, epoch_ckpt_name + ".pth")
             TrainUtils.save_model(
                 model=model,
@@ -533,6 +765,10 @@ def train(
 
     # terminate logging
     data_logger.close()
+
+    # Close rollout environment
+    if rollout_env is not None:
+        rollout_env.close()
 
     # Upload training videos to ClearML
     upload_videos_from_dir(clearml_task, video_dir, "training_rollouts")
@@ -594,6 +830,10 @@ def main(args: argparse.Namespace, clearml_task=None):
     if args.batch_size is not None:
         config.train.batch_size = args.batch_size
 
+    if args.video:
+        config.experiment.rollout.enabled = True
+        config.experiment.render_video = True
+
     # change location of experiment directory
     config.train.output_dir = os.path.abspath(os.path.join("./logs", args.log_dir, args.task))
 
@@ -632,7 +872,7 @@ def main(args: argparse.Namespace, clearml_task=None):
     # catch error during training and print it
     res_str = "finished run successfully!"
     try:
-        train(config, device, log_dir, ckpt_dir, video_dir, clearml_task=clearml_task)
+        train(config, device, log_dir, ckpt_dir, video_dir, task_name=args.task, clearml_task=clearml_task)
     except Exception as e:
         res_str = f"run failed with error:\n{e}\n\n{traceback.format_exc()}"
         mark_clearml_task_failed(clearml_task, status_message=str(e))
