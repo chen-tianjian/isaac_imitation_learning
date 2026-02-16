@@ -285,6 +285,7 @@ def resolve_dataset(dataset_arg: str) -> str:
 
     # Download dataset to local cache
     dataset = Dataset.get(dataset_id=dataset_id)  # type: ignore
+    logger.info("Downloading ClearML dataset...")
     local_dir = dataset.get_local_copy()
 
     if filename is not None:

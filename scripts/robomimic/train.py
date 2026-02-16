@@ -56,9 +56,9 @@ from isaac_imitation_learning.utils.clearml_utils import (
     init_clearml_task,
     mark_clearml_task_failed,
     maybe_execute_remotely,
+    report_video,
     resolve_dataset,
     upload_checkpoint,
-    upload_videos_from_dir,
 )
 
 from isaaclab.app import AppLauncher
@@ -415,19 +415,13 @@ def run_rollouts_with_stats(
 
     Returns:
         all_rollout_logs: Dict like {"env_name": {"Return": ..., "Horizon": ..., "Success_Rate": ...}}.
+        video_paths: List of paths to saved video files (may be empty).
     """
     env_name = env.cfg.__class__.__name__
     all_results = []
-
-    video_writer = None
-    if render_video and video_dir is not None:
-        video_filename = f"{env_name}_epoch_{epoch}.mp4" if epoch is not None else f"{env_name}.mp4"
-        video_path = os.path.join(video_dir, video_filename)
-        video_writer = imageio.get_writer(video_path, fps=20)
+    video_paths = []
 
     for ep_i in range(num_episodes):
-        # Only capture video for the first episode
-        capture_video = render_video and (ep_i == 0)
         results, video_frames = run_rollout_isaac_lab(
             policy=policy,
             env=env,
@@ -435,15 +429,21 @@ def run_rollouts_with_stats(
             horizon=horizon,
             device=device,
             video_skip=video_skip,
-            render_video=capture_video,
+            render_video=render_video,
             terminate_on_success=terminate_on_success,
         )
         all_results.append(results)
 
-        # Write video frames
-        if video_writer is not None and video_frames:
+        # Write video for this episode
+        if render_video and video_dir is not None and video_frames:
+            video_filename = f"{env_name}_epoch_{epoch}_ep_{ep_i}.mp4"
+            ep_video_path = os.path.join(video_dir, video_filename)
+            video_writer = imageio.get_writer(ep_video_path, fps=20)
             for frame in video_frames:
                 video_writer.append_data(frame)
+            video_writer.close()
+            video_paths.append(ep_video_path)
+            logger.info("Saved rollout video to %s", ep_video_path)
 
         logger.info(
             "  Episode %d/%d: Horizon=%d, Return=%.3f, Success=%s",
@@ -454,16 +454,12 @@ def run_rollouts_with_stats(
             bool(results["Success_Rate"]),
         )
 
-    if video_writer is not None:
-        video_writer.close()
-        logger.info("Saved rollout video to %s", video_path)
-
     # Aggregate stats across episodes
     avg_results = {}
     for key in all_results[0]:
         avg_results[key] = np.mean([r[key] for r in all_results])
 
-    return {env_name: avg_results}
+    return {env_name: avg_results}, video_paths
 
 
 def train(
@@ -702,12 +698,12 @@ def train(
         if (
             config.experiment.rollout.enabled
             and epoch >= config.experiment.rollout.warmstart
-            and epoch % config.experiment.rollout.rate == 0
+            and (epoch % config.experiment.rollout.rate == 0 or epoch == config.train.num_epochs)
         ):
             logger.info("Running rollout evaluation at epoch %d...", epoch)
             rollout_policy = RolloutPolicy(model, obs_normalization_stats=obs_normalization_stats)
             with torch.no_grad():
-                all_rollout_logs = run_rollouts_with_stats(
+                all_rollout_logs, rollout_video_paths = run_rollouts_with_stats(
                     policy=rollout_policy,
                     env=rollout_env,
                     success_term=success_term,
@@ -744,6 +740,10 @@ def train(
                 should_save_ckpt = True
                 ckpt_reason = save_info["ckpt_reason"] if ckpt_reason is None else ckpt_reason
 
+            # Upload rollout videos to ClearML immediately
+            for vpath in rollout_video_paths:
+                report_video(clearml_task, vpath, "training_rollouts", os.path.basename(vpath), epoch)
+
         # Save model checkpoints based on conditions (success rate, validation loss, etc)
         if should_save_ckpt and ckpt_dir is not None:
             ckpt_path = os.path.join(ckpt_dir, epoch_ckpt_name + ".pth")
@@ -769,9 +769,6 @@ def train(
     # Close rollout environment
     if rollout_env is not None:
         rollout_env.close()
-
-    # Upload training videos to ClearML
-    upload_videos_from_dir(clearml_task, video_dir, "training_rollouts")
 
 
 def main(args: argparse.Namespace, clearml_task=None):
