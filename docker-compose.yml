@@ -12,11 +12,13 @@ services:
     volumes:
       - .:/workspace
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY:-~/.Xauthority}:/root/.Xauthority:ro
       - ~/clearml.conf:/root/clearml.conf:ro
       - ~/.clearml:/root/.clearml
       - ~/.cache/torch:/root/.cache/torch
     environment:
       - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/root/.Xauthority
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all  # graphics + compute for Isaac Sim GUI
     deploy:
