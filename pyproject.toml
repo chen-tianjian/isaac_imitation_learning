@@ -23,6 +23,7 @@ dependencies = [
     "psutil",
     "clearml",
     "setuptools<82",
+    "cmake<3.31",  # >=3.31 breaks egl-probe build (CMakeLists.txt uses cmake_minimum_required < 3.5)
     "robomimic @ git+https://github.com/chen-tianjian/robomimic.git@act",
 ]
 
@@ -40,10 +41,10 @@ index-strategy = "unsafe-best-match"
 # isaacsim-core unconditionally depends on pywin32 (Windows-only); override with platform marker
 override-dependencies = ["pywin32==306; sys_platform == 'win32'"]
 
-# flatdict's setup.py uses pkg_resources (removed in setuptools>=78);
+# flatdict's setup.py uses pkg_resources (removed in setuptools>=82);
 # disable build isolation so it uses the environment's setuptools, and
 # constrain setuptools to a version that still includes pkg_resources
-no-build-isolation-package = ["flatdict"]
+no-build-isolation-package = ["flatdict", "egl-probe"]
 constraint-dependencies = ["setuptools<82"]
 
 [[tool.uv.index]]

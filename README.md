@@ -19,7 +19,7 @@ This Isaac Lab extension trains and evaluates imitation learning policies in GPU
     ```bash
     uv venv --python 3.11
     source .venv/bin/activate
-    uv pip install -e .
+    uv pip install -e . # or uv sync
     ```
 
 3. (Optional) Set up ClearML for experiment tracking:
