@@ -155,6 +155,7 @@ def init_clearml_task(args, task_type: str, default_task_name: str):
             task_type=task_type,
             auto_connect_arg_parser=False,
             auto_connect_frameworks={"tensorboard": True},
+            auto_resource_monitoring={"wait_for_first_iteration_to_start_sec": 86400},
         )
         task.connect(vars(args), name="Args")
         return task
