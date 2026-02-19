@@ -74,3 +74,6 @@ tests/__pycache__/
 # TacSL sensor
 **/tactile_record/*
 **/gelsight_r15_data/*
+
+# Claude Code execution plans
+docs/plans
