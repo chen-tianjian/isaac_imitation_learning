@@ -109,10 +109,17 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--rollout",
+    action="store_true",
+    default=False,
+    help="Enable rollout evaluation during training. Overrides experiment.rollout.enabled.",
+)
+
+parser.add_argument(
     "--video",
     action="store_true",
     default=False,
-    help="Enable rollout evaluation with video recording during training. Overrides experiment.rollout.enabled.",
+    help="Enable video recording during rollout evaluation. Overrides experiment.render_video.",
 )
 
 add_clearml_args(parser)
@@ -827,8 +834,10 @@ def main(args: argparse.Namespace, clearml_task=None):
     if args.batch_size is not None:
         config.train.batch_size = args.batch_size
 
-    if args.video:
+    if args.rollout:
         config.experiment.rollout.enabled = True
+
+    if args.video:
         config.experiment.render_video = True
 
     # change location of experiment directory
